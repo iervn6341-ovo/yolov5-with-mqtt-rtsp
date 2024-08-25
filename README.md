@@ -21,6 +21,11 @@ OPENBLAS_NUM_THREADS=1 python detect.py --weights ./last.pt --imgsz 160 --line-t
 
 請根據自身工作環境檔案之配置調整參數
 
+## 聲明
+
+我不擁有此專案，單純為研究使用
+
+若有冒犯請立即通知，會立即刪除
 
 ## 底下為原作者的內容
 <div align="center">
