@@ -1,3 +1,28 @@
+## 主要
+晶心比賽專案 
+
+### 配置
+
+主要測試環境
+
+- 主機: Raspberry Pi 4B 4GB
+- 作業系統: Debian 12
+- 內核: 6.6.31+rpt-rpi-v8
+- Python 版本: 3.9.19 (miniconda)
+
+### 運行
+
+在安裝完套件依賴後，先設定 .env 檔 (參考.envExample)
+
+之後在終端執行
+```bash=
+OPENBLAS_NUM_THREADS=1 python detect.py --weights ./last.pt --imgsz 160 --line-thickness 1 --conf-thres 0.5
+```
+
+請根據自身工作環境檔案之配置調整參數
+
+
+## 底下為原作者的內容
 <div align="center">
   <p>
     <a href="https://ultralytics.com/events/yolovision" target="_blank">

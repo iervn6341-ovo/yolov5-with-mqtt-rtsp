@@ -1,0 +1,7 @@
+# MQTT
+MQTT_BROKER="<mqtt broker ip>"
+MQTT_USERNAME="<mqtt authenticate username if already setup>"
+MQTT_PASSWORD="<mqtt authenticate password if already setup>"
+
+# RTSP
+RTSP_URL="<rtsp streaming url>"

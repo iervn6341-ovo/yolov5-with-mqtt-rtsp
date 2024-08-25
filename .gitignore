@@ -36,6 +36,8 @@ data/images/*
 !data/*.sh
 
 results*.csv
+mqtt_sub.py
+requirements.txt
 
 # Datasets -------------------------------------------------------------------------------------------------------------
 coco/

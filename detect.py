@@ -34,6 +34,11 @@ import os
 import platform
 import sys
 from pathlib import Path
+import threading
+import base64
+import json
+from dotenv import load_dotenv
+import paho.mqtt.client as mqtt
 
 import torch
 
@@ -42,6 +47,7 @@ ROOT = FILE.parents[0]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
+load_dotenv(dotenv_path=".env", override=True)
 
 from ultralytics.utils.plotting import Annotator, colors, save_one_box
 
@@ -97,6 +103,7 @@ def run(
     half=False,  # use FP16 half-precision inference
     dnn=False,  # use OpenCV DNN for ONNX inference
     vid_stride=1,  # video frame-rate stride
+    **kwargs
 ):
     """
     Runs YOLOv5 detection inference on various sources like images, videos, directories, streams, etc.
@@ -148,10 +155,11 @@ def run(
         run(source='data/videos/example.mp4', weights='yolov5s.pt', conf_thres=0.4, device='0')
         ```
     """
-    source = str(source)
+    source = os.getenv("RTSP_URL", None) or str(source)
     save_img = not nosave and not source.endswith(".txt")  # save inference images
     is_file = Path(source).suffix[1:] in (IMG_FORMATS + VID_FORMATS)
     is_url = source.lower().startswith(("rtsp://", "rtmp://", "http://", "https://"))
+    is_rtsp = source.lower().startswith(("rtsp://"))
     webcam = source.isnumeric() or source.endswith(".streams") or (is_url and not is_file)
     screenshot = source.lower().startswith("screen")
     if is_url and is_file:
@@ -169,7 +177,11 @@ def run(
 
     # Dataloader
     bs = 1  # batch_size
-    if webcam:
+    if is_rtsp:
+        view_img = False
+        dataset = LoadStreams(source, img_size=imgsz, stride=stride, auto=pt, vid_stride=vid_stride)
+        bs = len(dataset)
+    elif webcam:
         view_img = check_imshow(warn=True)
         dataset = LoadStreams(source, img_size=imgsz, stride=stride, auto=pt, vid_stride=vid_stride)
         bs = len(dataset)
@@ -289,6 +301,7 @@ def run(
                 cv2.waitKey(1)  # 1 millisecond
 
             # Save results (image with detections)
+            
             if save_img:
                 if dataset.mode == "image":
                     cv2.imwrite(save_path, im0)
@@ -308,7 +321,15 @@ def run(
                     vid_writer[i].write(im0)
 
         # Print time (inference-only)
-        LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
+        if len(det):
+            if MQTT_CLIENT.is_connected:
+                MQTT_CLIENT.publish("alert/img_tracking", json.dumps({
+                    "image_b64": base64.b64encode(im0).decode("UTF-8"),
+                    "detected_class": ",".join(names[int(c)] for c in det[:, 5].unique())
+                }))
+            else:
+                LOGGER.error("Couldn't connect to MQTT broker")
+        LOGGER.info(f"{s} //// {'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
 
     # Print results
     t = tuple(x.t / seen * 1e3 for x in dt)  # speeds per image
@@ -431,6 +452,15 @@ def main(opt):
     check_requirements(ROOT / "requirements.txt", exclude=("tensorboard", "thop"))
     run(**vars(opt))
 
+
+MQTT_CLIENT = mqtt.Client()
+if os.getenv("MQTT_USERNAME", None) and os.getenv("MQTT_PASSWORD", None):
+    MQTT_CLIENT.username_pw_set(os.getenv("MQTT_USERNAME"), os.getenv("MQTT_PASSWORD"))
+    
+MQTT_CLIENT.connect(os.getenv("MQTT_BROKER", "127.0.0.1"), 1883, 60)
+mqtt_thread = threading.Thread(target=MQTT_CLIENT.loop_forever)
+mqtt_thread.daemon = True 
+mqtt_thread.start()
 
 if __name__ == "__main__":
     opt = parse_opt()
